@@ -1,5 +1,5 @@
 from pygame import *
-from random import choice
+from random import choice, randint
 init()
 font.init()
 mixer.init()
@@ -11,7 +11,6 @@ WIDTH, HEIGHT = screen_info.current_w, screen_info.current_h
 FPS = 360
 
 font = font.SysFont('Arial', 35)
-
 window = display.set_mode((WIDTH, HEIGHT), flags=FULLSCREEN)
 display.set_caption('Shooter')
 clock = time.Clock() #game timer
@@ -30,7 +29,7 @@ lazer = image.load('lazer.png')
 
 
 
-sprites = sprite.Group
+sprites = sprite.Group()
 class GameSprite(sprite.Sprite):
     def __init__(self, sprite_image, width=60, height=60, x=100, y=250):
         super().__init__()
@@ -42,13 +41,14 @@ class GameSprite(sprite.Sprite):
         self.mask = mask.from_surface(self.image)
         sprites.add(self)
     def draw(self, window):
-        window.blit(self.image, self.rect)
+        window.blit(self.image, self.mask)
 #code
 
 class Player(GameSprite):
     
     def __init__(self, sprite_image, width=60, height=60, x=100, y=250):
         super().__init__(sprite_image,60,60, x, y)
+        
         self.hp = 100
         self.damage = 20
         self.points = 0
@@ -63,30 +63,33 @@ class Player(GameSprite):
         if keys[K_d] and self.rect.right < WIDTH:
             self.rect.x += self.speed
 
-        collidelist = sprite.spritecollide(self, enemys, False)
+        collidelist = sprite.spritecollide(self, enemys, False, sprite.collide_mask)
         if len(collidelist) > 0:
             self.hp = 0
 
 enemys = sprite.Group()
 class Enemy(GameSprite):
-    def __init__(self, sprite_image, width=30, height=30, x=0, y=0, hp=10):
-        super().__init__(sprite_image, width, height, x, y)
-        self.hp = hp
+    def __init__(self, width=100, height=70):
+        x = randint(0, WIDTH)
+        y = -150
+        super().__init__(alien, width, height, x, y)
         self.speed = 1
         enemys.add(self)
     
     def update(self):
-        self.direction = 'right'
-        if self.direction == 'right' and self.rect.right > 0:
-            self.rect.x += self.speed
-        else:
-            self.direction = 'left'
-        if self.direction == 'left' and self.rect.left < WIDTH:
-            self.rect.x -= self.speed
+        self.rect.y += self.speed
+        if self.rect.y > HEIGHT:
+            self.kill()
 
 
 
 player = Player(spaceship, 60, 60, 0, 600)
+
+Enemy()
+min_interval = 1000
+max_interval = 5000
+last_spawn_time = time.get_ticks()
+randinterval = randint(min_interval, max_interval)
 
 play = True
 while play:
@@ -111,12 +114,20 @@ while play:
         bg_y1 = -HEIGHT
     if bg_y2 > HEIGHT:
         bg_y2 = -HEIGHT
-    player.draw(window)
-    if not play == False:
-        enemys.update()
-        player.update()
+    sprites.draw(window)
+    if play:
+        now = time.get_ticks()
+        if randinterval < now - last_spawn_time:
+            Enemy()
+            if max_interval > min_interval:
+                max_interval -= 10
+            else:
+                max_interval == min_interval
+            last_spawn_time = time.get_ticks()
+            randinterval = randint(min_interval, max_interval)
+        sprites.update()
     if player.hp <= 0:
-        play = False
+        play = True
 
 
     
