@@ -1,5 +1,6 @@
 from pygame import *
 from random import choice, randint
+import pickle
 init()
 font.init()
 mixer.init()
@@ -28,10 +29,10 @@ bg = transform.scale(bg, (WIDTH, HEIGHT)) #resize bg
 bg_y1 = 0
 bg_y2 = -HEIGHT
 
-
-alien = image.load('alien.png')
-asteroid = image.load('asteroid.png')
-spaceship = image.load('spaceship.png')
+points_text = None
+alien = image.load('ships_biomech.png')
+asteroid = image.load('ships_asteroids.png')
+spaceship = image.load('spaceship.PNG')
 bullet_image = image.load('lazer.png')
 
 
@@ -54,29 +55,35 @@ class GameSprite(sprite.Sprite):
 
 class Player(GameSprite):
     
-    def __init__(self, sprite_image, width=60, height=60, x=100, y=250):
-        super().__init__(sprite_image,60,60, x, y)
+    def __init__(self, sprite_image, width=120, height=120, x=100, y=250):
+        super().__init__(sprite_image,120,120, x, y)
         
         self.hp = 100
         self.damage = 20
         self.points = 0
         self.speed = 1
+        self.missed = 0
 
     def update(self):
         global hp_text
         self.old_pos = self.rect.x, self.rect.y
         keys = key.get_pressed()
-        if keys[K_a] and self.rect.left > 0:
+        if keys[K_a]:
             self.rect.x -= self.speed
-        if keys[K_d] and self.rect.right < WIDTH:
+        if keys[K_d]:
             self.rect.x += self.speed
+        if self.rect.x > WIDTH:
+            self.rect.x = -120
+        if self.rect.x <= -120:
+            self.rect.x = WIDTH
 
         collidelist = sprite.spritecollide(self, enemys, False, sprite.collide_mask)
         if len(collidelist) > 0:
+
             self.hp = 0
         
     def fire(self):
-        Bullet(self.rect.x, self.rect.centery)
+        Bullet(self.rect.centerx, self.rect.centery)
         fire_sound.play(0, 0, 1)
 
 enemys = sprite.Group()
@@ -89,20 +96,45 @@ class Enemy(GameSprite):
         enemys.add(self)
     
     def update(self):
-        global hp_text
+        global hp_text, points_text, missed_text, max_points
         self.rect.y += self.speed
         if self.rect.y > HEIGHT:
             self.kill()
+            player.missed += 1
+            missed_text = font.render(f'Missed: {player.missed}', True, (255,255,255))
+
         
         bullets_collide =sprite.groupcollide(bullets, enemys, True, True, sprite.collide_mask)
-        collidelist = sprite.spritecollide(player, enemys, False, sprite.collide_mask)
+        for enemy in bullets_collide:
+            player.points += 1
+            if player.points > max_points:
+                max_points = player.points
+                max_points_text = font.render(f'Score: {max_points}', True, (255,255,255))
+                save_max_points()
+
+
+            points_text = font.render(f'Points: {player.points}', True, (255, 255, 255))
+        collidelist = sprite.spritecollide(player, enemys, True, sprite.collide_mask)
         for enemy in collidelist:
             player.hp -= 10
             hp_text = font.render(f'HP:{player.hp}', True, (255, 255, 255))
+            player.missed += 1
+            missed_text = font.render(f'Missed: {player.missed}', True, (255,255,255))
             enemys.remove(self)
 #        collidelist = sprite.spritecollide(self, bullets, True, sprite.collide_mask)
 #        if len(collidelist) > 0:
 #            self.kill()
+
+
+class Boost(GameSprite):
+    def __init__(self, type):
+        self.type = type
+    
+    def heal(self):
+        player.hp = 100
+
+        
+        
         
 
 bullets = sprite.Group()
@@ -125,8 +157,16 @@ max_interval = 5000
 last_spawn_time = time.get_ticks()
 randinterval = randint(min_interval, max_interval)
 
+
 hp_text = font.render(f'HP:{player.hp}', True, (255, 255, 255))
 points_text = font.render(f'Points:{player.points}', True, (255, 255, 255))
+missed_text = font.render(f'Missed: {player.missed}', True, (255,255,255))
+max_points = 0
+max_points_text = font.render(f'Score: {max_points}', True, (255,255,255))
+
+def save_max_points():
+    with open('points.dat', 'wb') as file:
+        pickle.dump(max_points, file)
 
 play = True
 while play:
@@ -176,6 +216,7 @@ while play:
 
     window.blit(hp_text, (10, 10))
     window.blit(points_text, (10, 50))
+    window.blit(missed_text, (10, 90))
     
     display.update()
     clock.tick(FPS)
